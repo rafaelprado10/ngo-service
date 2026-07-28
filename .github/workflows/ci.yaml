@@ -1,4 +1,4 @@
-name: volunteer-service-CI
+name: ngo-service-CI
 run-name: Deploy to ${{ inputs.deploy_target }} by @${{ github.actor }}
 
 on:
@@ -20,9 +20,10 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
+          cache: pip
 
       - name: Install dependences
         run: |
@@ -113,7 +114,7 @@ jobs:
             PATCH=$((PATCH + 1))
             NEXT_TAG="v${MAJOR}.${MINOR}.${PATCH}"
           fi
-          echo "release_tag=${NEXT_TAG}" >> "$GITHUB_OUTPUT"
+          echo "release_tag=${NEXT_TAG//[$'\r\n ']}" >> "$GITHUB_OUTPUT"
           echo "Using release tag: ${NEXT_TAG}"
 
   docker_build_push:
@@ -126,17 +127,18 @@ jobs:
     env:
       AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
       AWS_REGION: ${{ secrets.AWS_REGION }}
-      ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+      ECR_REPOSITORY: ngo-service
       ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
       IMAGE_VERSION: ${{ needs.compute_release_tag.outputs.release_tag }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
         with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Validate AWS account and ECR settings
@@ -147,7 +149,7 @@ jobs:
           fi
           CALLER_ACCOUNT="$(aws sts get-caller-identity --query Account --output text)"
           if [ "${CALLER_ACCOUNT}" != "${AWS_ACCOUNT_ID}" ]; then
-            echo "OIDC role authenticated in account ${CALLER_ACCOUNT}, but AWS_ACCOUNT_ID secret is ${AWS_ACCOUNT_ID}"
+            echo "Configured AWS account ${CALLER_ACCOUNT}, but AWS_ACCOUNT_ID secret is ${AWS_ACCOUNT_ID}"
             exit 1
           fi
 
@@ -157,10 +159,14 @@ jobs:
       - name: Set image tag
         id: image
         run: |
-          IMAGE_TAG="${IMAGE_VERSION}"
+          IMAGE_TAG="$(echo "${IMAGE_VERSION}" | tr -d '\r\n')"
           IMAGE_URI="${ECR_REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+
           echo "tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
           echo "uri=${IMAGE_URI}" >> "$GITHUB_OUTPUT"
+
+          echo "IMAGE_TAG=${IMAGE_TAG}"
+          echo "IMAGE_URI=${IMAGE_URI}"
 
       - name: Build Docker image
         run: docker build -t "${{ steps.image.outputs.uri }}" .
@@ -194,8 +200,11 @@ jobs:
         env:
           RELEASE_TAG: ${{ needs.compute_release_tag.outputs.release_tag }}
           ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+          ECR_REPOSITORY: ngo-service
         run: |
+          echo "Updating manifest image tag to ${RELEASE_TAG}"
+          echo "ECR_REGISTRY: ${ECR_REGISTRY}"
+          echo "ECR_REPOSITORY: ${ECR_REPOSITORY}"
           MANIFEST_PATH=""
           if [ -f "k8s/deployment.yaml" ]; then
             MANIFEST_PATH="k8s/deployment.yaml"
@@ -216,7 +225,7 @@ jobs:
             exit 1
           fi
 
-          sed -i -E "s|(image:\\s*${ECR_REGISTRY}/${ECR_REPOSITORY}:).*|\\1${RELEASE_TAG}|g" "${MANIFEST_PATH}"
+          sed -i -E "s|(image:[[:space:]]*${ECR_REGISTRY}/${ECR_REPOSITORY}:).*|\1${RELEASE_TAG}|g" "${MANIFEST_PATH}"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
