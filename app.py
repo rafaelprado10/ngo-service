@@ -24,7 +24,8 @@ SERVICE_NAME = "ngo-service"
 HOSTNAME = os.getenv("HOSTNAME", os.uname().nodename)
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "host=localhost port=5432 dbname=ngo_service user=postgres password=postgres",
+    "host=localhost port=5432 dbname=ngo_service "
+    "user=postgres password=postgres",
 )
 
 
@@ -72,11 +73,17 @@ def create_ngo():
     log_operation(tid, f"{request.method} {request.path} started")
     log_operation(
         tid,
-        f"request method={request.method} path={request.path} remote={request.remote_addr}",
+        (
+            f"request method={request.method} "
+            f"path={request.path} "
+            f"remote={request.remote_addr}"
+        ),
     )
 
     data = request.get_json()
-    if not data or not all(k in data for k in ('name', 'email', 'cause', 'city')):
+    if not data or not all(
+        k in data for k in ('name', 'email', 'cause', 'city')
+    ):
         log_operation(tid, "request.validation_failed missing_fields")
         return jsonify({"error": "Campos obrigatórios ausentes"}), 400
 
@@ -84,8 +91,16 @@ def create_ngo():
     try:
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
             cur.execute(
-                "INSERT INTO ngos (name, email, cause, city) VALUES (%s, %s, %s, %s) RETURNING *",
-                (data['name'], data['email'], data['cause'], data['city']),
+                (
+                    "INSERT INTO ngos (name, email, cause, city) "
+                    "VALUES (%s, %s, %s, %s) RETURNING *"
+                ),
+                (
+                    data['name'],
+                    data['email'],
+                    data['cause'],
+                    data['city'],
+                ),
             )
             new_ngo = cur.fetchone()
             conn.commit()
@@ -93,7 +108,8 @@ def create_ngo():
             log_operation(
                 tid,
                 (
-                    f"ngo.created name={data['name']} email={data['email']} "
+                    f"ngo.created name={data['name']} "
+                    f"email={data['email']} "
                     f"duration_ms={(time.time() - start) * 1000:.0f}"
                 ),
             )
@@ -119,7 +135,11 @@ def get_ngos():
     log_operation(tid, f"{request.method} {request.path} started")
     log_operation(
         tid,
-        f"request method={request.method} path={request.path} remote={request.remote_addr}",
+        (
+            f"request method={request.method} "
+            f"path={request.path} "
+            f"remote={request.remote_addr}"
+        ),
     )
 
     conn = pool.getconn()
