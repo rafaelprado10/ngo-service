@@ -17,7 +17,7 @@ spec:
         - name: ngo-service
           image: 451638006344.dkr.ecr.us-east-1.amazonaws.com/ngo-service:v1.0.0
           ports:
-            - containerPort: 8082
+            - containerPort: 8081
               name: http
           env:
             - name: DATABASE_URL
@@ -28,7 +28,7 @@ spec:
           readinessProbe:
             httpGet:
               path: /health
-              port: 8082
+              port: 8081
             initialDelaySeconds: 10
             periodSeconds: 5
             timeoutSeconds: 2
@@ -36,7 +36,7 @@ spec:
           livenessProbe:
             httpGet:
               path: /health
-              port: 8082
+              port: 8081
             initialDelaySeconds: 15
             periodSeconds: 10
             timeoutSeconds: 2
