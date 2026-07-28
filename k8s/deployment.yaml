@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: ngo-service
-          image: 451638006344.dkr.ecr.us-east-1.amazonaws.com/ngo-service:v1.0.0
+          image: 451638006344.dkr.ecr.us-east-1.amazonaws.com/ngo-service:v1.0.3
           ports:
             - containerPort: 8081
               name: http
