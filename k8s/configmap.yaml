@@ -4,6 +4,6 @@ metadata:
   name: ngo-service-config
   namespace: ngo-service
 data:
-  PORT: "8083"
+  PORT: "8081"
   AWS_REGION: "us-east-1"
   AWS_DYNAMODB_TABLE: "fase_5"
